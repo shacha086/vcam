@@ -16,6 +16,7 @@ import android.widget.Toast;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
@@ -25,9 +26,32 @@ import de.robv.android.xposed.XposedHelpers;
 
 public class Camera2SessionHook {
 
+    private static final List<XC_MethodHook.Unhook> DYNAMIC_HOOKS = new ArrayList<>();
+
+    private static void trackHook(XC_MethodHook.Unhook unhook) {
+        if (unhook == null) return;
+        synchronized (DYNAMIC_HOOKS) {
+            DYNAMIC_HOOKS.add(unhook);
+        }
+        HookRegistry.add(unhook);
+    }
+
+    public static void unhookAll() {
+        synchronized (DYNAMIC_HOOKS) {
+            for (XC_MethodHook.Unhook unhook : new ArrayList<>(DYNAMIC_HOOKS)) {
+                try {
+                    unhook.unhook();
+                } catch (Throwable t) {
+                    XposedBridge.log("【VCAM】Camera2 unhook 失败: " + t);
+                }
+            }
+            DYNAMIC_HOOKS.clear();
+        }
+    }
+
     // ======================== processCamera2Init ========================
     public static void processCamera2Init(final Class hooked_class) {
-        XposedHelpers.findAndHookMethod(hooked_class, "onOpened", CameraDevice.class, new XC_MethodHook() {
+        trackHook(XposedHelpers.findAndHookMethod(hooked_class, "onOpened", CameraDevice.class, new XC_MethodHook() {
             @Override
             protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
                 SharedState.need_recreate = true;
@@ -78,7 +102,7 @@ public class Camera2SessionHook {
                 }
 
                 // Hook CameraDevice.createCaptureSession (传统3参数)
-                XposedHelpers.findAndHookMethod(param.args[0].getClass(), "createCaptureSession",
+                trackHook(XposedHelpers.findAndHookMethod(param.args[0].getClass(), "createCaptureSession",
                         List.class, CameraCaptureSession.StateCallback.class, Handler.class, new XC_MethodHook() {
                     @Override
                     protected void beforeHookedMethod(MethodHookParam paramd) throws Throwable {
@@ -91,11 +115,11 @@ public class Camera2SessionHook {
                             }
                         }
                     }
-                });
+                }));
 
                 // Hook CameraDevice.createCaptureSessionByOutputConfigurations (API 24+)
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                    XposedHelpers.findAndHookMethod(param.args[0].getClass(),
+                    trackHook(XposedHelpers.findAndHookMethod(param.args[0].getClass(),
                             "createCaptureSessionByOutputConfigurations", List.class,
                             CameraCaptureSession.StateCallback.class, Handler.class, new XC_MethodHook() {
                         @Override
@@ -110,11 +134,11 @@ public class Camera2SessionHook {
                                 }
                             }
                         }
-                    });
+                    }));
                 }
 
                 // Hook CameraDevice.createConstrainedHighSpeedCaptureSession
-                XposedHelpers.findAndHookMethod(param.args[0].getClass(),
+                trackHook(XposedHelpers.findAndHookMethod(param.args[0].getClass(),
                         "createConstrainedHighSpeedCaptureSession", List.class,
                         CameraCaptureSession.StateCallback.class, Handler.class, new XC_MethodHook() {
                     @Override
@@ -128,11 +152,11 @@ public class Camera2SessionHook {
                             }
                         }
                     }
-                });
+                }));
 
                 // Hook CameraDevice.createReprocessableCaptureSession (API 23+)
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                    XposedHelpers.findAndHookMethod(param.args[0].getClass(),
+                    trackHook(XposedHelpers.findAndHookMethod(param.args[0].getClass(),
                             "createReprocessableCaptureSession", InputConfiguration.class, List.class,
                             CameraCaptureSession.StateCallback.class, Handler.class, new XC_MethodHook() {
                         @Override
@@ -146,12 +170,12 @@ public class Camera2SessionHook {
                                 }
                             }
                         }
-                    });
+                    }));
                 }
 
                 // Hook CameraDevice.createReprocessableCaptureSessionByConfigurations (API 24+)
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                    XposedHelpers.findAndHookMethod(param.args[0].getClass(),
+                    trackHook(XposedHelpers.findAndHookMethod(param.args[0].getClass(),
                             "createReprocessableCaptureSessionByConfigurations", InputConfiguration.class,
                             List.class, CameraCaptureSession.StateCallback.class, Handler.class, new XC_MethodHook() {
                         @Override
@@ -166,12 +190,12 @@ public class Camera2SessionHook {
                                 }
                             }
                         }
-                    });
+                    }));
                 }
 
                 // Hook CameraDevice.createCaptureSession with SessionConfiguration (API 28+)
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                    XposedHelpers.findAndHookMethod(param.args[0].getClass(), "createCaptureSession",
+                    trackHook(XposedHelpers.findAndHookMethod(param.args[0].getClass(), "createCaptureSession",
                             SessionConfiguration.class, new XC_MethodHook() {
                         @Override
                         protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
@@ -189,26 +213,26 @@ public class Camera2SessionHook {
                                 processCamera2SessionCallback(SharedState.sessionConfiguration.getStateCallback());
                             }
                         }
-                    });
+                    }));
                 }
             }
-        });
+        }));
 
         // Hook StateCallback.onError
-        XposedHelpers.findAndHookMethod(hooked_class, "onError", CameraDevice.class, int.class, new XC_MethodHook() {
+        trackHook(XposedHelpers.findAndHookMethod(hooked_class, "onError", CameraDevice.class, int.class, new XC_MethodHook() {
             @Override
             protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
                 XposedBridge.log("【VCAM】相机错误onerror：" + (int) param.args[1]);
             }
-        });
+        }));
 
         // Hook StateCallback.onDisconnected
-        XposedHelpers.findAndHookMethod(hooked_class, "onDisconnected", CameraDevice.class, new XC_MethodHook() {
+        trackHook(XposedHelpers.findAndHookMethod(hooked_class, "onDisconnected", CameraDevice.class, new XC_MethodHook() {
             @Override
             protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
                 XposedBridge.log("【VCAM】相机断开onDisconnected ：");
             }
-        });
+        }));
     }
 
     // ======================== createVirtualSurface ========================
@@ -560,3 +584,4 @@ public class Camera2SessionHook {
         }
     }
 }
+

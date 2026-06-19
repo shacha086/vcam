@@ -35,6 +35,11 @@ public class MicrophoneHandler {
         hookMediaRecorderSetCamera(lpparam);
     }
 
+    public static void unhookAll() {
+        // 该类当前使用的是进程级静态 hook，后续如补充 Unhook 保存，可在这里统一释放
+        XposedBridge.log("【VCAM】Microphone unhookAll 目前为安全空实现");
+    }
+
     // ======================== AudioRecord.read ========================
     private static void hookAudioRecordRead(final XC_LoadPackage.LoadPackageParam lpparam) {
         try {
@@ -330,3 +335,4 @@ public class MicrophoneHandler {
         });
     }
 }
+

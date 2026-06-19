@@ -118,12 +118,21 @@ public final class ConfigWatcher {
     /** 尾随执行防抖：每次调用重置计时器，300ms 内无新事件才真正执行回调 */
     private void fireCallback() {
         LogUtil.log("【DIAG】ConfigWatcher.fireCallback 被调用");
+        if (HookGuards.isDisabled()) {
+            LogUtil.log("【DIAG】ConfigWatcher.fireCallback → 模块已禁用，直接忽略回调");
+            return;
+        }
         if (pendingCallback != null) {
             mainHandler.removeCallbacks(pendingCallback);
         }
         pendingCallback = new Runnable() {
             @Override
             public void run() {
+                if (HookGuards.isDisabled()) {
+                    LogUtil.log("【DIAG】ConfigWatcher → 模块已禁用，跳过 onMediaSourceChanged");
+                    pendingCallback = null;
+                    return;
+                }
                 LogUtil.log("【DIAG】ConfigWatcher → 防抖结束, 触发 onMediaSourceChanged");
                 pendingCallback = null;
                 callback.onMediaSourceChanged();

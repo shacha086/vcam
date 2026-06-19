@@ -15,6 +15,8 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 import de.robv.android.xposed.XC_MethodHook;
 import de.robv.android.xposed.XposedBridge;
@@ -22,6 +24,8 @@ import de.robv.android.xposed.XposedHelpers;
 import de.robv.android.xposed.callbacks.XC_LoadPackage;
 
 public class Camera1Handler {
+
+    private static final List<XC_MethodHook.Unhook> DYNAMIC_HOOKS = new ArrayList<>();
 
     public static void init(final XC_LoadPackage.LoadPackageParam lpparam) {
         hookSetPreviewTexture(lpparam);
@@ -34,9 +38,30 @@ public class Camera1Handler {
         hookTakePicture(lpparam);
     }
 
+    private static void trackHook(XC_MethodHook.Unhook unhook) {
+        if (unhook == null) return;
+        synchronized (DYNAMIC_HOOKS) {
+            DYNAMIC_HOOKS.add(unhook);
+        }
+        HookRegistry.add(unhook);
+    }
+
+    public static void unhookAll() {
+        synchronized (DYNAMIC_HOOKS) {
+            for (XC_MethodHook.Unhook unhook : new ArrayList<>(DYNAMIC_HOOKS)) {
+                try {
+                    unhook.unhook();
+                } catch (Throwable t) {
+                    XposedBridge.log("【VCAM】Camera1 unhook 失败: " + t);
+                }
+            }
+            DYNAMIC_HOOKS.clear();
+        }
+    }
+
     // ======================== setPreviewTexture ========================
     private static void hookSetPreviewTexture(final XC_LoadPackage.LoadPackageParam lpparam) {
-        XposedHelpers.findAndHookMethod("android.hardware.Camera", lpparam.classLoader, "setPreviewTexture",
+        trackHook(XposedHelpers.findAndHookMethod("android.hardware.Camera", lpparam.classLoader, "setPreviewTexture",
                 SurfaceTexture.class, new XC_MethodHook() {
             @Override
             protected void beforeHookedMethod(MethodHookParam param) {
@@ -81,12 +106,12 @@ public class Camera1Handler {
                     }
                 }
             }
-        });
+        }));
     }
 
     // ======================== startPreview ========================
     private static void hookStartPreview(final XC_LoadPackage.LoadPackageParam lpparam) {
-        XposedHelpers.findAndHookMethod("android.hardware.Camera", lpparam.classLoader, "startPreview",
+        trackHook(XposedHelpers.findAndHookMethod("android.hardware.Camera", lpparam.classLoader, "startPreview",
                 new XC_MethodHook() {
             @Override
             protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
@@ -184,12 +209,12 @@ public class Camera1Handler {
                     }
                 }
             }
-        });
+        }));
     }
 
     // ======================== setPreviewDisplay ========================
     private static void hookSetPreviewDisplay(final XC_LoadPackage.LoadPackageParam lpparam) {
-        XposedHelpers.findAndHookMethod("android.hardware.Camera", lpparam.classLoader, "setPreviewDisplay",
+        trackHook(XposedHelpers.findAndHookMethod("android.hardware.Camera", lpparam.classLoader, "setPreviewDisplay",
                 SurfaceHolder.class, new XC_MethodHook() {
             @Override
             protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
@@ -231,12 +256,12 @@ public class Camera1Handler {
                 SharedState.mcamera1.setPreviewTexture(SharedState.c1_fake_texture);
                 param.setResult(null);
             }
-        });
+        }));
     }
 
     // ======================== setPreviewCallbackWithBuffer ========================
     private static void hookSetPreviewCallbackWithBuffer(final XC_LoadPackage.LoadPackageParam lpparam) {
-        XposedHelpers.findAndHookMethod("android.hardware.Camera", lpparam.classLoader,
+        trackHook(XposedHelpers.findAndHookMethod("android.hardware.Camera", lpparam.classLoader,
                 "setPreviewCallbackWithBuffer", Camera.PreviewCallback.class, new XC_MethodHook() {
             @Override
             protected void beforeHookedMethod(MethodHookParam param) {
@@ -244,12 +269,12 @@ public class Camera1Handler {
                     processCallback(param);
                 }
             }
-        });
+        }));
     }
 
     // ======================== addCallbackBuffer ========================
     private static void hookAddCallbackBuffer(final XC_LoadPackage.LoadPackageParam lpparam) {
-        XposedHelpers.findAndHookMethod("android.hardware.Camera", lpparam.classLoader, "addCallbackBuffer",
+        trackHook(XposedHelpers.findAndHookMethod("android.hardware.Camera", lpparam.classLoader, "addCallbackBuffer",
                 byte[].class, new XC_MethodHook() {
             @Override
             protected void beforeHookedMethod(MethodHookParam param) {
@@ -257,12 +282,12 @@ public class Camera1Handler {
                     param.args[0] = new byte[((byte[]) param.args[0]).length];
                 }
             }
-        });
+        }));
     }
 
     // ======================== setPreviewCallback ========================
     private static void hookSetPreviewCallback(final XC_LoadPackage.LoadPackageParam lpparam) {
-        XposedHelpers.findAndHookMethod("android.hardware.Camera", lpparam.classLoader, "setPreviewCallback",
+        trackHook(XposedHelpers.findAndHookMethod("android.hardware.Camera", lpparam.classLoader, "setPreviewCallback",
                 Camera.PreviewCallback.class, new XC_MethodHook() {
             @Override
             protected void beforeHookedMethod(MethodHookParam param) {
@@ -270,12 +295,12 @@ public class Camera1Handler {
                     processCallback(param);
                 }
             }
-        });
+        }));
     }
 
     // ======================== setOneShotPreviewCallback ========================
     private static void hookSetOneShotPreviewCallback(final XC_LoadPackage.LoadPackageParam lpparam) {
-        XposedHelpers.findAndHookMethod("android.hardware.Camera", lpparam.classLoader, "setOneShotPreviewCallback",
+        trackHook(XposedHelpers.findAndHookMethod("android.hardware.Camera", lpparam.classLoader, "setOneShotPreviewCallback",
                 Camera.PreviewCallback.class, new XC_MethodHook() {
             @Override
             protected void beforeHookedMethod(MethodHookParam param) {
@@ -283,12 +308,12 @@ public class Camera1Handler {
                     processCallback(param);
                 }
             }
-        });
+        }));
     }
 
     // ======================== takePicture ========================
     private static void hookTakePicture(final XC_LoadPackage.LoadPackageParam lpparam) {
-        XposedHelpers.findAndHookMethod("android.hardware.Camera", lpparam.classLoader, "takePicture",
+        trackHook(XposedHelpers.findAndHookMethod("android.hardware.Camera", lpparam.classLoader, "takePicture",
                 Camera.ShutterCallback.class, Camera.PictureCallback.class,
                 Camera.PictureCallback.class, Camera.PictureCallback.class, new XC_MethodHook() {
             @Override
@@ -301,16 +326,16 @@ public class Camera1Handler {
                     processAShotJPEG(param, 3);
                 }
             }
-        });
+        }));
     }
 
     // ======================== processCallback ========================
     private static void processCallback(XC_MethodHook.MethodHookParam param) {
+        if (HookGuards.isDisabled()) {
+            return;
+        }
         Class preview_cb_class = param.args[0].getClass();
         int need_stop = 0;
-        if (HookGuards.isDisabled()) {
-            need_stop = 1;
-        }
         File file = HookGuards.getVideoFile();
         SharedState.need_to_show_toast = HookGuards.shouldShowToast();
         if (!file.exists()) {
@@ -326,10 +351,11 @@ public class Camera1Handler {
             need_stop = 1;
         }
         final int finalNeed_stop = need_stop;
-        XposedHelpers.findAndHookMethod(preview_cb_class, "onPreviewFrame",
+        XC_MethodHook.Unhook unhook = XposedHelpers.findAndHookMethod(preview_cb_class, "onPreviewFrame",
                 byte[].class, android.hardware.Camera.class, new XC_MethodHook() {
             @Override
             protected void beforeHookedMethod(MethodHookParam paramd) throws Throwable {
+                if (HookGuards.isDisabled()) return;
                 Camera localcam = (android.hardware.Camera) paramd.args[1];
                 if (localcam.equals(SharedState.camera_onPreviewFrame)) {
                     while (SharedState.data_buffer == null) {
@@ -371,6 +397,7 @@ public class Camera1Handler {
                 }
             }
         });
+        trackHook(unhook);
     }
 
     // ======================== processAShotYUV ========================
@@ -381,7 +408,7 @@ public class Camera1Handler {
             XposedBridge.log("【VCAM】" + eee);
         }
         Class callback = param.args[1].getClass();
-        XposedHelpers.findAndHookMethod(callback, "onPictureTaken",
+        trackHook(XposedHelpers.findAndHookMethod(callback, "onPictureTaken",
                 byte[].class, android.hardware.Camera.class, new XC_MethodHook() {
             @Override
             protected void beforeHookedMethod(MethodHookParam paramd) throws Throwable {
@@ -407,7 +434,7 @@ public class Camera1Handler {
                     XposedBridge.log("【VCAM】" + ee.toString());
                 }
             }
-        });
+        }));
     }
 
     // ======================== processAShotJPEG ========================
@@ -418,7 +445,7 @@ public class Camera1Handler {
             XposedBridge.log("【VCAM】" + eee);
         }
         Class callback = param.args[index].getClass();
-        XposedHelpers.findAndHookMethod(callback, "onPictureTaken",
+        trackHook(XposedHelpers.findAndHookMethod(callback, "onPictureTaken",
                 byte[].class, android.hardware.Camera.class, new XC_MethodHook() {
             @Override
             protected void beforeHookedMethod(MethodHookParam paramd) throws Throwable {
@@ -447,7 +474,7 @@ public class Camera1Handler {
                     XposedBridge.log("【VCAM】" + ee.toString());
                 }
             }
-        });
+        }));
     }
 
     // ======================== 工具方法 ========================
@@ -623,3 +650,4 @@ public class Camera1Handler {
         }
     }
 }
+

@@ -23,6 +23,13 @@ public class HookMain implements IXposedHookLoadPackage {
     private static volatile boolean configWatcherInitialized = false;
 
     public void handleLoadPackage(final XC_LoadPackage.LoadPackageParam lpparam) throws Exception {
+        if (HookGuards.isDisabled()) {
+            if (HookRegistry.isInstalled()) {
+                unhookAllRuntimeHooks();
+            }
+            XposedBridge.log("【VCAM】模块已禁用，跳过所有 hook 注册: " + lpparam.packageName);
+            return;
+        }
 
         // ========== callApplicationOnCreate：初始化 Context、权限检查、目录迁移 ==========
         XposedHelpers.findAndHookMethod("android.app.Instrumentation", lpparam.classLoader,
@@ -133,6 +140,8 @@ public class HookMain implements IXposedHookLoadPackage {
             XposedBridge.log("【VCAM】MicrophoneHandler 初始化失败: " + e);
         }
 
+        HookRegistry.installCompleted();
+
         // ========== 配置变更监听：广播 + 文件监控 → 热切换视频/声音 ==========
         if (!lpparam.packageName.equals(BuildConfig.APPLICATION_ID)) {
             try {
@@ -141,6 +150,27 @@ public class HookMain implements IXposedHookLoadPackage {
                 XposedBridge.log("【VCAM】ConfigWatcher 初始化失败: " + e);
             }
         }
+    }
+
+    private static void unhookAllRuntimeHooks() {
+        try {
+            Camera1Handler.unhookAll();
+        } catch (Throwable t) {
+            XposedBridge.log("【VCAM】Camera1 unhookAll 失败: " + t);
+        }
+        try {
+            Camera2SessionHook.unhookAll();
+        } catch (Throwable t) {
+            XposedBridge.log("【VCAM】Camera2 unhookAll 失败: " + t);
+        }
+        try {
+            MicrophoneHandler.unhookAll();
+        } catch (Throwable t) {
+            XposedBridge.log("【VCAM】Microphone unhookAll 失败: " + t);
+        }
+        HookRegistry.unhookAll();
+        Camera1Handler.stopAllPlayers();
+        Camera2SessionHook.stopAllPlayers();
     }
 
     private void initConfigWatcher(final XC_LoadPackage.LoadPackageParam lpparam) {
@@ -163,9 +193,8 @@ public class HookMain implements IXposedHookLoadPackage {
     XposedBridge.log("【VCAM】配置监听 → 媒体源变更，触发热切换");
     try {
         if (com.yaahua.vcam.HookGuards.isDisabled()) {
-            XposedBridge.log("【VCAM】模块已禁用，停止所有播放器");
-            com.yaahua.vcam.Camera1Handler.stopAllPlayers();
-            com.yaahua.vcam.Camera2SessionHook.stopAllPlayers();
+            XposedBridge.log("【VCAM】模块已禁用，立即卸载所有 hook");
+            unhookAllRuntimeHooks();
             return;
         }
     } catch (Exception e) {

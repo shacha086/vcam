@@ -402,6 +402,10 @@ public class ConfigManager {
                 dir.setReadable(true, false);
             } catch (Exception ignored) {}
             if (context != null) {
+                if (HookGuards.isDisabled()) {
+                    LogUtil.log("【DIAG】ConfigManager.save → 模块已禁用，跳过 notifyChange/广播");
+                    return;
+                }
                 try {
                     context.getContentResolver().notifyChange(IpcContract.URI_CONFIG, null);
                     LogUtil.log("【DIAG】ConfigManager.save → notifyChange 已发送");
@@ -472,3 +476,4 @@ public class ConfigManager {
         }
     }
 }
+
